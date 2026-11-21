@@ -19,8 +19,9 @@ terraform {
   }
 }
 
-# Credentials come from the environment (Terraform Cloud workspace
-# environment variables, or your shell when running locally):
-#   INFLUXDB_URL    e.g. https://eu-central-1-1.aws.cloud2.influxdata.com
-#   INFLUXDB_TOKEN  an All Access API token from the InfluxDB Cloud UI
-provider "influxdb" {}
+# The token comes from the environment variable INFLUXDB_TOKEN (sensitive
+# environment variable in the Terraform Cloud workspace): an All Access API
+# token from the InfluxDB Cloud UI.
+provider "influxdb" {
+  url = var.influxdb_url
+}

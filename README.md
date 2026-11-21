@@ -20,15 +20,14 @@ Retention is 30 days for both (the Free plan maximum; `retention_days`).
 
 ## Setup
 
-1. **InfluxDB Cloud UI** (`https://<region>.cloud2.influxdata.com`):
-   - note the **region URL** (browser address bar) and the **organization name**
-     (avatar → Organization → Settings)
-   - create an **All Access API token** (Load Data → API Tokens → Generate) for Terraform
-2. **Terraform Cloud**: `terraform login`, then `terraform init` creates the workspace
-   `mygermanium/influxdb-cloud`. In the workspace → Variables add:
-   - Environment variable `INFLUXDB_URL` = the region URL
-   - Environment variable `INFLUXDB_TOKEN` = the All Access token, **sensitive**
-   - Terraform variable `org_name` = the organization name
+InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization `Germanium`
+(both set as variable defaults).
+
+1. **InfluxDB Cloud UI**: create an **All Access API token** for Terraform
+   (Load Data → API Tokens → Generate API Token → All Access API Token).
+2. **Terraform Cloud** workspace `mygermanium/influxdb-cloud` (created by the first
+   `terraform init`) → Variables → add an **Environment variable** `INFLUXDB_TOKEN` with
+   that token, marked **Sensitive**.
 3. Plan and apply:
    ```sh
    terraform init
@@ -48,9 +47,9 @@ In `germanium-git/argocd`, `apps/telegraf/telegraf.conf`:
 
 ```toml
 [[outputs.influxdb_v2]]
-  urls = ["https://<region>.cloud2.influxdata.com"]
+  urls = ["https://westeurope-1.azure.cloud2.influxdata.com"]
   token = "$INFLUXDB_TOKEN"
-  organization = "<org_name>"
+  organization = "Germanium"
   bucket = "Network"
 ```
 
