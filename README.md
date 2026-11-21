@@ -20,8 +20,8 @@ Retention is 30 days for both (the Free plan maximum; `retention_days`).
 
 ## Setup
 
-InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization `Germanium`
-(both set as variable defaults).
+InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization ID
+`15297d32235a99a0` (both set as variable defaults).
 
 1. **InfluxDB Cloud UI**: create an **All Access API token** for Terraform
    (Load Data → API Tokens → Generate API Token → All Access API Token).
@@ -41,6 +41,15 @@ InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization
    terraform output -raw reader_token
    ```
 
+## CI (GitHub Actions)
+
+`.github/workflows/terraform.yml`:
+
+- **Pull request** → `fmt`, `validate`, `plan`; the plan is posted (and updated) as a PR comment
+- **Merge / push to `main`** → `terraform apply -auto-approve`
+- Runs execute in Terraform Cloud; one at a time (concurrency group)
+- Needs the GitHub secret `TF_API_TOKEN` (a Terraform Cloud API token)
+
 ## Pointing telegraf at InfluxDB Cloud
 
 In `germanium-git/argocd`, `apps/telegraf/telegraf.conf`:
@@ -49,7 +58,7 @@ In `germanium-git/argocd`, `apps/telegraf/telegraf.conf`:
 [[outputs.influxdb_v2]]
   urls = ["https://westeurope-1.azure.cloud2.influxdata.com"]
   token = "$INFLUXDB_TOKEN"
-  organization = "Germanium"
+  organization = "15297d32235a99a0"   # org ID works as the organization
   bucket = "Network"
 ```
 

@@ -1,9 +1,5 @@
-data "influxdb_organization" "this" {
-  name = var.org_name
-}
-
 locals {
-  org_id = data.influxdb_organization.this.id
+  org_id = var.org_id
 }
 
 resource "influxdb_bucket" "this" {

@@ -4,10 +4,10 @@ variable "influxdb_url" {
   default     = "https://westeurope-1.azure.cloud2.influxdata.com"
 }
 
-variable "org_name" {
-  description = "InfluxDB Cloud organization name (Organization -> Settings in the UI)"
+variable "org_id" {
+  description = "InfluxDB Cloud organization ID (the /orgs/<id> part of the UI URL)"
   type        = string
-  default     = "Germanium"
+  default     = "15297d32235a99a0"
 }
 
 variable "retention_days" {
