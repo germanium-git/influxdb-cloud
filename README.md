@@ -23,19 +23,19 @@ Retention is 30 days for both (the Free plan maximum; `retention_days`).
 InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization ID
 `15297d32235a99a0` (both set as variable defaults).
 
-1. **InfluxDB Cloud UI**: create an **All Access API token** for Terraform
+1. **[InfluxDB Cloud UI](https://westeurope-1.azure.cloud2.influxdata.com)**: create an
+   **All Access API token** for Terraform
    (Load Data → API Tokens → Generate API Token → All Access API Token).
-2. **Terraform Cloud** workspace `mygermanium/influxdb-cloud` (created by the first
-   `terraform init`) → Variables → add an **Environment variable** `INFLUXDB_TOKEN` with
-   that token, marked **Sensitive**.
-3. Plan and apply:
+2. **Terraform Cloud** workspace
+   [`mygermanium/influxdb-cloud`](https://app.terraform.io/app/mygermanium/workspaces/influxdb-cloud)
+   (created by the first `terraform init`) →
+   [Variables](https://app.terraform.io/app/mygermanium/workspaces/influxdb-cloud/variables) →
+   add an **Environment variable** `INFLUXDB_TOKEN` with that token, marked **Sensitive**.
+3. Read the per-app InfluxDB tokens Terraform created (write-only tokens for Telegraf
+   and temp-monitor, read-only token for dashboards). The values are kept in the
+   Terraform Cloud state and marked sensitive, so read them locally:
    ```sh
    terraform init
-   terraform plan
-   terraform apply
-   ```
-4. Read the generated tokens:
-   ```sh
    terraform output -json writer_tokens | jq -r .telegraf
    terraform output -json writer_tokens | jq -r '."temp-monitor"'
    terraform output -raw reader_token
@@ -46,9 +46,12 @@ InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization
 `.github/workflows/terraform.yml`:
 
 - **Pull request** → `fmt`, `validate`, `plan`; the plan is posted (and updated) as a PR comment
-- **Merge / push to `main`** → `terraform apply -auto-approve`
+- **Merge / push to `main`** → fresh plan, then `apply` waits for approval in the `production` environment
+- **Daily 05:00 UTC** → drift check; Slack alert on drift or error
 - Runs execute in Terraform Cloud; one at a time (concurrency group)
-- Needs the GitHub secret `TF_API_TOKEN` (a Terraform Cloud API token)
+- Secrets: `TF_API_TOKEN` (Actions + Dependabot), `SLACK_WEBHOOK_URL`
+
+Details, diagrams and secret renewal: [docs/terraform-workflow.md](docs/terraform-workflow.md).
 
 ## Pointing telegraf at InfluxDB Cloud
 
