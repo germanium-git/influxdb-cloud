@@ -23,11 +23,14 @@ Retention is 30 days for both (the Free plan maximum; `retention_days`).
 InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization ID
 `15297d32235a99a0` (both set as variable defaults).
 
-1. **InfluxDB Cloud UI**: create an **All Access API token** for Terraform
+1. **[InfluxDB Cloud UI](https://westeurope-1.azure.cloud2.influxdata.com)**: create an
+   **All Access API token** for Terraform
    (Load Data → API Tokens → Generate API Token → All Access API Token).
-2. **Terraform Cloud** workspace `mygermanium/influxdb-cloud` (created by the first
-   `terraform init`) → Variables → add an **Environment variable** `INFLUXDB_TOKEN` with
-   that token, marked **Sensitive**.
+2. **Terraform Cloud** workspace
+   [`mygermanium/influxdb-cloud`](https://app.terraform.io/app/mygermanium/workspaces/influxdb-cloud)
+   (created by the first `terraform init`) →
+   [Variables](https://app.terraform.io/app/mygermanium/workspaces/influxdb-cloud/variables) →
+   add an **Environment variable** `INFLUXDB_TOKEN` with that token, marked **Sensitive**.
 3. Read the generated tokens:
    ```sh
    terraform init
