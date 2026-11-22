@@ -1,7 +1,10 @@
-# Plan on pull requests (plan posted as a PR comment), apply on merge to main.
+# Plan on pull requests (plan posted as a PR comment). On merge to main: plan
+# again, then wait for approval in the `production` environment before applying.
+# Daily at 05:00 UTC: drift check, Slack alert if the real infra differs from code.
 # Runs execute in Terraform Cloud (mygermanium/influxdb-cloud); the InfluxDB
 # token lives there as the sensitive environment variable INFLUXDB_TOKEN.
-# Required GitHub secret: TF_API_TOKEN (Terraform Cloud API token).
+# Required GitHub secrets: TF_API_TOKEN (Terraform Cloud API token, also as a
+# Dependabot secret), SLACK_WEBHOOK_URL (Slack incoming webhook for drift alerts).
 name: Terraform
 
 on:
@@ -9,7 +12,14 @@ on:
     branches: [main]
   push:
     branches: [main]
+  schedule:
+    - cron: "0 5 * * *"
   workflow_dispatch:
+    inputs:
+      drift_check:
+        description: "Only run the drift check (no apply)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -71,7 +81,7 @@ jobs:
             if (plan.length > max) plan = plan.slice(0, max) + '\n... (truncated, see the workflow log)';
             const icon = process.env.OUTCOME === 'success' ? '✅' : '❌';
             const marker = '<!-- terraform-plan -->';
-            const body = `${marker}\n### ${icon} Terraform plan\n\n\`\`\`\n${plan}\n\`\`\`\n\nMerging to \`main\` applies this plan.`;
+            const body = `${marker}\n### ${icon} Terraform plan\n\n\`\`\`\n${plan}\n\`\`\`\n\nMerging to \`main\` plans again and waits for approval in the \`production\` environment before applying.`;
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
             const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
@@ -82,9 +92,41 @@ jobs:
               await github.rest.issues.createComment({ owner, repo, issue_number, body });
             }
 
-  apply:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+  # Fresh plan on main so the approver sees what will actually be applied
+  plan-main:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.drift_check)
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.15.8"
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Plan
+        run: |
+          set +e
+          terraform plan -input=false -no-color > plan.txt 2>&1
+          rc=$?
+          set -e
+          cat plan.txt
+          {
+            echo '### Terraform plan (approve the `apply` job to apply it)'
+            echo '```'
+            sed -n '/Terraform will perform\|No changes\.\|Error:/,$p' plan.txt | head -c 60000
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+  apply:
+    needs: plan-main
+    runs-on: ubuntu-latest
+    # Protected environment: requires manual approval before this job starts
     environment: production
     steps:
       - uses: actions/checkout@v7
@@ -100,3 +142,66 @@ jobs:
 
       - name: Apply
         run: terraform apply -input=false -auto-approve -no-color
+
+  drift:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.drift_check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.15.8"
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+          terraform_wrapper: false
+
+      - name: Init
+        run: terraform init -input=false
+
+      # -detailed-exitcode: 0 = no changes, 1 = error, 2 = drift
+      - name: Plan
+        id: plan
+        run: |
+          set +e
+          terraform plan -input=false -no-color -detailed-exitcode > plan.txt 2>&1
+          rc=$?
+          set -e
+          cat plan.txt
+          case $rc in
+            0) status=clean ;;
+            2) status=drift ;;
+            *) status=error ;;
+          esac
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Drift check: $status"
+            echo '```'
+            sed -n '/Terraform will perform\|No changes\.\|Error:/,$p' plan.txt | head -c 60000
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify Slack
+        if: steps.plan.outputs.status != 'clean'
+        env:
+          STATUS: ${{ steps.plan.outputs.status }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$STATUS" = drift ]; then
+            title=":warning: Terraform drift detected in *${GITHUB_REPOSITORY}*"
+            summary=$(grep -E '^Plan:' plan.txt | tail -1)
+            details=$(grep -oE '^  # [^ ]+ (will|must)[^(]*' plan.txt | sed 's/^  # /• /' | head -20)
+          else
+            title=":x: Terraform drift check failed in *${GITHUB_REPOSITORY}*"
+            summary=$(grep -m1 -E 'Error:' plan.txt)
+            details=$(grep -A5 -m1 -E 'Error:' plan.txt | tail -n +2)
+          fi
+          text=$(printf '%s\n%s\n```%s```\n<%s|View run>' "$title" "$summary" "${details:-n/a}" "$RUN_URL")
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL is not set; skipping Slack notification"
+          else
+            jq -n --arg text "$text" '{text: $text}' \
+              | curl -fsS -X POST -H 'Content-Type: application/json' --data @- "$SLACK_WEBHOOK_URL"
+          fi
+          # Show the run as failed so drift is visible in the Actions tab too
+          exit 1
