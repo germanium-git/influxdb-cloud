@@ -28,14 +28,9 @@ InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization
 2. **Terraform Cloud** workspace `mygermanium/influxdb-cloud` (created by the first
    `terraform init`) → Variables → add an **Environment variable** `INFLUXDB_TOKEN` with
    that token, marked **Sensitive**.
-3. Plan and apply:
+3. Read the generated tokens:
    ```sh
    terraform init
-   terraform plan
-   terraform apply
-   ```
-4. Read the generated tokens:
-   ```sh
    terraform output -json writer_tokens | jq -r .telegraf
    terraform output -json writer_tokens | jq -r '."temp-monitor"'
    terraform output -raw reader_token
@@ -46,9 +41,12 @@ InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization
 `.github/workflows/terraform.yml`:
 
 - **Pull request** → `fmt`, `validate`, `plan`; the plan is posted (and updated) as a PR comment
-- **Merge / push to `main`** → `terraform apply -auto-approve`
+- **Merge / push to `main`** → fresh plan, then `apply` waits for approval in the `production` environment
+- **Daily 05:00 UTC** → drift check; Slack alert on drift or error
 - Runs execute in Terraform Cloud; one at a time (concurrency group)
-- Needs the GitHub secret `TF_API_TOKEN` (a Terraform Cloud API token)
+- Secrets: `TF_API_TOKEN` (Actions + Dependabot), `SLACK_WEBHOOK_URL`
+
+Details, diagrams and secret renewal: [docs/terraform-workflow.md](docs/terraform-workflow.md).
 
 ## Pointing telegraf at InfluxDB Cloud
 
