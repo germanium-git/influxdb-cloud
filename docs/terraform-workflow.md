@@ -16,8 +16,10 @@ the results.
 | Daily at 05:00 UTC (`schedule`) | `drift` | Drift check, Slack alert on drift or error |
 | `workflow_dispatch` with `drift_check=true` | `drift` | Drift check on demand: `gh workflow run terraform.yml -f drift_check=true` |
 
-All jobs share the concurrency group `terraform-influxdb-cloud`, so a drift
-check never runs at the same time as an apply; it waits in the queue instead.
+The `apply` and `drift` jobs share the concurrency group `terraform-influxdb-cloud`,
+so a drift check never runs at the same time as an apply; it waits in the queue
+instead. Plans (`plan`, `plan-main`) change nothing and are not queued, so a PR
+plan never waits for an apply that is pending approval.
 
 ## How drift is detected
 
