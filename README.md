@@ -46,7 +46,7 @@ InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization
 `.github/workflows/terraform.yml`:
 
 - **Pull request** → `fmt`, `validate`, `plan`; the plan is posted (and updated) as a PR comment
-- **Merge / push to `main`** → fresh plan, then `apply` waits for approval in the `production` environment
+- **Merge / push to `main`** → fresh plan; if it has changes, `apply` waits for approval in the `production` environment (no changes → apply skipped)
 - **Daily 05:00 UTC** → drift check; Slack alert on drift or error
 - Runs execute in Terraform Cloud; apply and drift check never overlap (concurrency group), plans run right away
 - Secrets: `TF_API_TOKEN` (Actions + Dependabot), `SLACK_WEBHOOK_URL`
