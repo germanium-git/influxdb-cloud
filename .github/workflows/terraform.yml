@@ -76,7 +76,7 @@ jobs:
             if (plan.length > max) plan = plan.slice(0, max) + '\n... (truncated, see the workflow log)';
             const icon = process.env.OUTCOME === 'success' ? '✅' : '❌';
             const marker = '<!-- terraform-plan -->';
-            const body = `${marker}\n### ${icon} Terraform plan\n\n\`\`\`\n${plan}\n\`\`\`\n\nMerging to \`main\` plans again and waits for approval in the \`production\` environment before applying.`;
+            const body = `${marker}\n### ${icon} Terraform plan\n\n\`\`\`\n${plan}\n\`\`\`\n\nMerging to \`main\` plans again; if there are changes, it waits for approval in the \`production\` environment before applying.`;
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
             const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
@@ -91,6 +91,8 @@ jobs:
   plan-main:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.drift_check)
     runs-on: ubuntu-latest
+    outputs:
+      changes: ${{ steps.plan.outputs.changes }}
     steps:
       - uses: actions/checkout@v7
 
@@ -103,23 +105,35 @@ jobs:
       - name: Init
         run: terraform init -input=false
 
+      # -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes to apply
       - name: Plan
+        id: plan
         run: |
           set +e
-          terraform plan -input=false -no-color > plan.txt 2>&1
+          terraform plan -input=false -no-color -detailed-exitcode > plan.txt 2>&1
           rc=$?
           set -e
           cat plan.txt
+          case $rc in
+            0) echo "changes=false" >> "$GITHUB_OUTPUT"
+               heading='### Terraform plan: no changes, nothing to approve' ;;
+            2) echo "changes=true" >> "$GITHUB_OUTPUT"
+               heading='### Terraform plan (approve the `apply` job to apply it)' ;;
+            *) heading='### Terraform plan failed' ;;
+          esac
           {
-            echo '### Terraform plan (approve the `apply` job to apply it)'
+            echo "$heading"
             echo '```'
             sed -n '/Terraform will perform\|No changes\.\|Error:/,$p' plan.txt | head -c 60000
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          exit $rc
+          [ "$rc" -eq 1 ] && exit 1
+          exit 0
 
   apply:
     needs: plan-main
+    # Skipped (no approval requested) when the plan has no changes
+    if: needs.plan-main.outputs.changes == 'true'
     runs-on: ubuntu-latest
     # apply and drift share this queue so they never overlap; plans don't
     # change anything and are not queued

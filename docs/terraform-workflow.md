@@ -11,7 +11,7 @@ the results.
 | Trigger | Job(s) | What happens |
 |---|---|---|
 | Pull request to `main` | `plan` | `fmt`, `validate`, `plan`; the plan is posted as a PR comment |
-| Push to `main` (merge) | `plan-main` → `apply` | Fresh plan shown in the run summary, then `apply` **waits for manual approval** in the `production` environment |
+| Push to `main` (merge) | `plan-main` → `apply` | Fresh plan shown in the run summary. If it has changes, `apply` **waits for manual approval** in the `production` environment; if not, `apply` is skipped |
 | `workflow_dispatch` | `plan-main` → `apply` | Same as a push to `main` |
 | Daily at 05:00 UTC (`schedule`) | `drift` | Drift check, Slack alert on drift or error |
 | `workflow_dispatch` with `drift_check=true` | `drift` | Drift check on demand: `gh workflow run terraform.yml -f drift_check=true` |
@@ -85,7 +85,9 @@ flowchart TD
     SLACK["Slack channel<br/>Terraform Drift app"]
 
     PR --> PLAN --> COMMENT
-    PUSH --> PLANMAIN --> GATE -->|approved| APPLY
+    PUSH --> PLANMAIN
+    PLANMAIN -->|changes| GATE -->|approved| APPLY
+    PLANMAIN -->|no changes| SKIP["apply skipped<br/>no approval needed"]
     CRON --> DRIFT --> RESULT
     RESULT --> OK
     RESULT --> ALERT
@@ -176,7 +178,8 @@ Never commit it to the repo.
 ## Approval gate
 
 The `production` environment (GitHub → Settings → Environments) requires a
-review from `germanium-git` before `apply` starts; self-review is allowed and
+review from `germanium-git` before `apply` starts (only when the plan on `main`
+has changes; otherwise `apply` is skipped); self-review is allowed and
 only the `main` branch can deploy. To approve: open the run →
 **Review deployments** → `production` → **Approve and deploy**. Check the plan
 in the run summary of `plan-main` first.
