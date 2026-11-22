@@ -53,6 +53,20 @@ InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization
 
 Details, diagrams and secret renewal: [docs/terraform-workflow.md](docs/terraform-workflow.md).
 
+### Renewing secrets
+
+[`scripts/renew-secrets.sh`](scripts/renew-secrets.sh) walks you through renewing a
+secret step by step: what to click and where, then it saves the new value with `gh`
+and can verify it with a drift check. Run it from the repo root in your own terminal
+(it needs `gh` logged in and reads secrets with hidden input, so not via Claude Code's `!`):
+
+```sh
+scripts/renew-secrets.sh          # menu
+scripts/renew-secrets.sh tf       # TF_API_TOKEN (Actions + Dependabot), expires yearly
+scripts/renew-secrets.sh slack    # SLACK_WEBHOOK_URL
+scripts/renew-secrets.sh influx   # INFLUXDB_TOKEN (Terraform Cloud workspace variable)
+```
+
 ## Pointing telegraf at InfluxDB Cloud
 
 In `germanium-git/argocd`, `apps/telegraf/telegraf.conf`:
