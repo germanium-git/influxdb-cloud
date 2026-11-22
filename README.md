@@ -31,7 +31,9 @@ InfluxDB Cloud: `https://westeurope-1.azure.cloud2.influxdata.com`, organization
    (created by the first `terraform init`) →
    [Variables](https://app.terraform.io/app/mygermanium/workspaces/influxdb-cloud/variables) →
    add an **Environment variable** `INFLUXDB_TOKEN` with that token, marked **Sensitive**.
-3. Read the generated tokens:
+3. Read the per-app InfluxDB tokens Terraform created (write-only tokens for Telegraf
+   and temp-monitor, read-only token for dashboards). The values are kept in the
+   Terraform Cloud state and marked sensitive, so read them locally:
    ```sh
    terraform init
    terraform output -json writer_tokens | jq -r .telegraf
